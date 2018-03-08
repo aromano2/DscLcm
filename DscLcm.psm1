@@ -44,15 +44,14 @@
 
     .EXAMPLE This command will set the RebootNodeIfNeeded to 'True' on the target, 'localhost'
         Set-LcmSetting -CimSession localhost -RebootNodeIfNeeded $true
-
-
 #>
 Function Set-LcmSetting
 {
     Param
     (
         [Parameter(Mandatory = $true)]
-        [psobject]$CimSession,
+        [psobject]
+        $CimSession,
         
         [Parameter()]
         [int]
@@ -111,11 +110,12 @@ Function Set-LcmSetting
         $DeleteMofWhenDone = $true
     )
 
+    #Requires -RunAsAdministrator
+
     $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop
-    $commonParameters = [System.Management.Automation.Cmdlet]::CommonParameters + [System.Management.Automation.Cmdlet]::OptionalCommonParameters
     $computerName = Get-ComputerName -CimSession $CimSession
     $null = Test-OutputPath -Path $OutputPath
-    $pendingChanges = $PSBoundParameters.Keys.Where({$commonParameters -notcontains $_})
+    $pendingChanges = $PSBoundParameters.Keys.Where({$script:commonParameters -notcontains $_})
 
     foreach($key in $pendingChanges)
     {
@@ -172,12 +172,14 @@ Function Reset-LcmConfiguration
         $DeleteMofWhenDone = $true
     )
 
+    #Requires -RunAsAdministrator
+    
     $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop | Select-Object -Property RebootNodeIfNeeded,ConfigurationMode,RefreshMode,ActionAfterReboot
     $computerName = Get-ComputerName -CimSession $CimSession
     $null = Test-OutputPath -Path $OutputPath
     $configurations = Initialize-SettingsBlock -Configuration $currentLcmConfig
 
-    Invoke-LcmConfig -ComputerName $computerName -Configuration $configurations -OutputPath $OutputPath
+    $null = Invoke-LcmConfig -ComputerName $computerName -Configuration $configurations -OutputPath $OutputPath
     Set-DscLocalConfigurationManager -CimSession $CimSession -Path $OutputPath -Force
 
     foreach($stage in @('Current','Previous','Pending'))
@@ -190,7 +192,6 @@ Function Reset-LcmConfiguration
         Remove-Item $OutputPath\$computerName.meta.mof -Force -ErrorAction Ignore
     }
 }
-
 
 <#
     .SYNOPSIS Removes a partial configuration by name from a target local configuration manager
@@ -245,6 +246,8 @@ Function Remove-LcmPartialConfiguration
         [boolean]
         $DeleteMofWhenDone = $true
     )
+
+    #Requires -RunAsAdministrator
     
     $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop
     $computerName = Get-ComputerName -CimSession $CimSession
@@ -362,8 +365,9 @@ Function Add-LcmPartialConfiguration
         $DeleteMofWhenDone = $true
     )
     
+    #Requires -RunAsAdministrator
+
     $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop
-    $commonParameters = [System.Management.Automation.Cmdlet]::CommonParameters + [System.Management.Automation.Cmdlet]::OptionalCommonParameters
     $computerName = Get-ComputerName -CimSession $CimSession
     $null = Test-OutputPath -Path $OutputPath
     $existingPartials = $currentLcmConfig.PartialConfigurations.ResourceId
@@ -374,7 +378,7 @@ Function Add-LcmPartialConfiguration
         Write-Warning "Partial configuration $PartialName already exists on computer $ComputerName"
     }
         
-    $pendingChanges = $PSBoundParameters.Keys.Where({$commonParameters -notcontains $_})
+    $pendingChanges = $PSBoundParameters.Keys.Where({$script:commonParameters -notcontains $_})
 
     $hashChanges = @{}
     foreach($pendingChange in $pendingChanges)
@@ -382,6 +386,10 @@ Function Add-LcmPartialConfiguration
         if($pendingChange -eq 'PartialName')
         {
             $hashChanges.Add("ResourceId", "[PartialConfiguration]$($PSBoundParameters[$pendingChange])")
+        }
+        elseif($pendingChange -eq 'DependsOn')
+        {
+            $hashChanges.Add($pendingChange, "[PartialConfiguration]$($PSBoundParameters[$pendingChange])")
         }
         else
         {
@@ -492,8 +500,9 @@ Function Set-LcmPartialConfiguration
         $DeleteMofWhenDone = $true
     )
 
+    #Requires -RunAsAdministrator
+
     $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop
-    $commonParameters = [System.Management.Automation.Cmdlet]::CommonParameters + [System.Management.Automation.Cmdlet]::OptionalCommonParameters
     $computerName = Get-ComputerName -CimSession $CimSession
     $null = Test-OutputPath -Path $OutputPath
     $partialConfiguration = $currentLcmConfig.PartialConfigurations.Where({$($_.ResourceId.Replace('[PartialConfiguration]','')) -eq $PartialName})
@@ -503,7 +512,7 @@ Function Set-LcmPartialConfiguration
         throw "Invalid partial name, $PartialName."
     }
         
-    $pendingChanges = $PSBoundParameters.Keys.Where({$commonParameters -notcontains $_})
+    $pendingChanges = $PSBoundParameters.Keys.Where({$script:commonParameters -notcontains $_})
     $configurations = Initialize-SettingsBlock -Configuration $currentLcmConfig
     foreach($partial in $currentLcmConfig.PartialConfigurations)
     {
@@ -515,6 +524,10 @@ Function Set-LcmPartialConfiguration
                 if($pendingChange -eq 'PartialName')
                 {
                     $hashChanges.Add("ResourceId", "[PartialConfiguration]$($PSBoundParameters[$pendingChange])")
+                }
+                elseif($pendingChange -eq 'DependsOn')
+                {
+                    $hashChanges.Add($pendingChange, "[PartialConfiguration]$($PSBoundParameters[$pendingChange])")
                 }
                 else
                 {
@@ -679,10 +692,13 @@ Function Initialize-SettingsBlock
     return $output
 }
 
+$script:commonParameters = [System.Management.Automation.Cmdlet]::CommonParameters + [System.Management.Automation.Cmdlet]::OptionalCommonParameters
+$script:commonParameters += 'CimSession', 'OutputPath','DeleteMofWhenDone'
+
 Export-ModuleMember -Function @(
     'Set-LcmSetting',
     'Reset-LcmConfiguration',
     'Remove-LcmPartialConfiguration',
-    'Add-LcmPartialConfiguration'
+    'Add-LcmPartialConfiguration',
     'Set-LcmPartialConfiguration'
 )
