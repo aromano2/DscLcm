@@ -47,78 +47,94 @@
 
 
 #>
-function Set-LcmSetting
+Function Set-LcmSetting
 {
-    param
+    Param
     (
         [Parameter(Mandatory = $true)]
         [psobject]$CimSession,
-                
-        [string]$OutputPath = "$env:windir\Temp\MofStore",
-
-        [int]$ConfigurationModeFrequencyMins,
         
-        [bool]$RebootNodeIfNeeded,
+        [Parameter()]
+        [int]
+        $ConfigurationModeFrequencyMins,
         
+        [Parameter()]
+        [bool]
+        $RebootNodeIfNeeded,
+        
+        [Parameter()]
         [ValidateSet('ApplyOnly','ApplyAndMonitor','ApplyAndAutoCorrect')]
-        [string]$ConfigurationMode = 'ApplyAndAutoCorrect',
+        [string]
+        $ConfigurationMode = 'ApplyAndAutoCorrect',
         
+        [Parameter()]
         [ValidateSet('ContinueConfiguration','StopConfiguration')]
-        [string]$ActionAfterReboot,
+        [string]
+        $ActionAfterReboot,
         
+        [Parameter()]
         [ValidateSet('Disabled','Push','Pull')]
-        [string]$RefreshMode = 'Push',
+        [string]
+        $RefreshMode,
         
-        [string]$CertificateId,
+        [Parameter()]
+        [string]
+        $CertificateId,
         
-        [guid]$ConfigurationId,
+        [Parameter()]
+        [guid]
+        $ConfigurationId,
         
-        [int]$RefreshFrequencyMins,
+        [Parameter()]
+        [int]
+        $RefreshFrequencyMins,
         
-        [bool]$AllowModuleOverwrite,
+        [Parameter()]
+        [bool]
+        $AllowModuleOverwrite,
         
+        [Parameter()]
         [ValidateSet('None','ForceModuleImport','All')]
-        [string]$DebugMode,
+        [string]
+        $DebugMode,
         
-        [int]$StatusRetentionTimeInDays,
+        [Parameter()]
+        [int]
+        $StatusRetentionTimeInDays,
+
+        [Parameter()]        
+        [string]
+        $OutputPath = "C:\Windows\Temp\MofStore",
         
-        [switch]$DeleteMofWhenDone        
+        [Parameter()]
+        [boolean]
+        $DeleteMofWhenDone = $true
     )
 
-    $oldEap = $ErrorActionPreference
-    $ErrorActionPreference = 'Stop'
-    $commonParameters = Get-CommonParameterName
+    $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop
+    $commonParameters = [System.Management.Automation.Cmdlet]::CommonParameters + [System.Management.Automation.Cmdlet]::OptionalCommonParameters
     $computerName = Get-ComputerName -CimSession $CimSession
+    $null = Test-OutputPath -Path $OutputPath
+    $pendingChanges = $PSBoundParameters.Keys.Where({$commonParameters -notcontains $_})
 
-    try
+    foreach($key in $pendingChanges)
     {
-        Test-OutputPath -Path $OutputPath
-        $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession | Select-Object -ExcludeProperty DebugMode
-        $pendingChanges = $PSBoundParameters.Keys.Where({$commonParameters -notcontains $_})
-
-        foreach($key in $pendingChanges)
-        {
-            $currentLcmConfig.$key = $PSBoundParameters[$key]
-        }
-
-        $configurations = Initialize-SettingsBlock -Configuration $currentLcmConfig
-            
-        foreach($partial in $currentLcmConfig.PartialConfigurations)
-        {
-            $configurations += Initialize-PartialBlock -Configuration $partial
-        }
-        
-        $null = Invoke-LcmConfig -ComputerName $computerName -Configuration $configurations -OutputPath $OutputPath
-        Set-DscLocalConfigurationManager -CimSession $CimSession -Path $OutputPath -Force
+        $currentLcmConfig.$key = $PSBoundParameters[$key]
     }
-    finally
-    {
-        if($DeleteMofWhenDone)
-        {
-            Remove-Item $OutputPath\$computerName.meta.mof -Force -ErrorAction Ignore
-        }
 
-        $ErrorActionPreference = $oldEap
+    $configurations = Initialize-SettingsBlock -Configuration $currentLcmConfig
+            
+    foreach($partial in $currentLcmConfig.PartialConfigurations)
+    {
+        $configurations += Initialize-PartialBlock -Configuration $partial
+    }
+        
+    $null = Invoke-LcmConfig -ComputerName $computerName -Configuration $configurations -OutputPath $OutputPath
+    Set-DscLocalConfigurationManager -CimSession $CimSession -Path $OutputPath -Force
+
+    if($DeleteMofWhenDone)
+    {
+        Remove-Item $OutputPath\$computerName.meta.mof -Force -ErrorAction Ignore
     }
 }
 
@@ -139,45 +155,39 @@ function Set-LcmSetting
     .EXAMPLE This command will reset the lcm on the target, 'localhost'
         Reset-LcmConfiguration -CimSession localhost
 #>
-function Reset-LcmConfiguration
+Function Reset-LcmConfiguration
 {
     [CmdletBinding()]
-    param
+    Param
     (
         [Parameter(Mandatory = $true)]
-        [psobject]$CimSession,
+        [psobject]
+        $CimSession,
 
-        [string]$OutputPath = "$env:windir\Temp\MofStore",
+        [string]
+        $OutputPath = "C:\Windows\Temp\MofStore",
 
-        [switch]$DeleteMofWhenDone
+        [Parameter()]
+        [boolean]
+        $DeleteMofWhenDone = $true
     )
 
-    $oldEap = $ErrorActionPreference
-    $ErrorActionPreference = 'Stop'
+    $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop | Select-Object -Property RebootNodeIfNeeded,ConfigurationMode,RefreshMode,ActionAfterReboot
     $computerName = Get-ComputerName -CimSession $CimSession
-    
-    try
+    $null = Test-OutputPath -Path $OutputPath
+    $configurations = Initialize-SettingsBlock -Configuration $currentLcmConfig
+
+    Invoke-LcmConfig -ComputerName $computerName -Configuration $configurations -OutputPath $OutputPath
+    Set-DscLocalConfigurationManager -CimSession $CimSession -Path $OutputPath -Force
+
+    foreach($stage in @('Current','Previous','Pending'))
     {
-        Test-OutputPath -Path $OutputPath
-        $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession | Select-Object -Property RebootNodeIfNeeded,ConfigurationMode,RefreshMode,ActionAfterReboot
-        $configurations = Initialize-SettingsBlock -Configuration $currentLcmConfig
-
-        Invoke-LcmConfig -ComputerName $computerName -Configuration $configurations -OutputPath $OutputPath
-        Set-DscLocalConfigurationManager -CimSession $CimSession -Path $OutputPath -Force
-
-        foreach($stage in @('Current','Previous','Pending'))
-        {
-            Remove-DscConfigurationDocument -CimSession $CimSession -Stage $stage -Force
-        }
+        Remove-DscConfigurationDocument -CimSession $CimSession -Stage $stage -Force
     }
-    finally
-    {        
-        if($DeleteMofWhenDone)
-        {
-            Remove-Item $OutputPath\$computerName.meta.mof -Force -ErrorAction Ignore
-        }
 
-        $ErrorActionPreference = $oldEap
+    if($DeleteMofWhenDone)
+    {
+        Remove-Item $OutputPath\$computerName.meta.mof -Force -ErrorAction Ignore
     }
 }
 
@@ -193,8 +203,20 @@ function Reset-LcmConfiguration
     .PARAMETER OutputPath
         The output path for mof files to be stored.
 
-    .PARAMETER PartialName
-        The name of the partial configuration to remove from the target
+    .PARAMETER ConfigurationSource
+        An array of names of configuration servers, previously defined in ConfigurationRepositoryWeb and ConfigurationRepositoryShare blocks, where the partial configuration is pulled from.
+    
+    .PARAMETER Description
+        Text used to describe the partial configuration.
+            
+    .PARAMETER ExclusiveResources
+        An array of resources exclusive to this partial configuration.
+
+    .PARAMETER RefreshMode
+        Specifies what happens after a reboot during the application of a configuration. 
+
+    .PARAMETER ResourceModuleSource
+        An array of the names of resource servers from which to download required resources for this partial configuration         
 
     .PARAMETER DeleteMofWhenDone
         Specifies whether or not to cleanup the resulting meta.mof file
@@ -202,63 +224,59 @@ function Reset-LcmConfiguration
     .EXAMPLE This command will remove the partial configuration 'test partial' on the target, 'localhost'
         Remove-LcmPartialConfiguration -CimSession localhost -PartialName 'test partial'
 #>
-function Remove-LcmPartialConfiguration
+Function Remove-LcmPartialConfiguration
 {
     [CmdletBinding()]
-    param
+    Param
     (    
         [Parameter(Mandatory = $true)]
-        [psobject]$CimSession,
+        [psobject]
+        $CimSession,
         
         [Parameter(Mandatory = $true)]
-        [string]$PartialName,
+        [string]
+        $PartialName,
 
-        [string]$OutputPath = "$env:windir\Temp\MofStore",
+        [Parameter()]
+        [string]
+        $OutputPath = "C:\Windows\Temp\MofStore",
 
-        [switch]$DeleteMofWhenDone        
+        [Parameter()]
+        [boolean]
+        $DeleteMofWhenDone = $true
     )
     
-    $oldEap = $ErrorActionPreference
-    $ErrorActionPreference = 'Stop'
+    $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop
     $computerName = Get-ComputerName -CimSession $CimSession
+    $null = Test-OutputPath -Path $OutputPath
+    $partialConfiguration = $currentLcmConfig.PartialConfigurations.Where({$($_.ResourceId.Replace('[PartialConfiguration]','')) -eq $PartialName})
 
-    try
+    if(-not $partialConfiguration)
     {
-        Test-OutputPath -Path $OutputPath
-        $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession | Select-Object -ExcludeProperty DebugMode       
-        $partialConfiguration = $currentLcmConfig.PartialConfigurations.Where({$($_.ResourceId.Replace('[PartialConfiguration]','')) -eq $PartialName})
-
-        if(-not $partialConfiguration)
-        {
-            throw "Invalid partial name, $PartialName."
-        }
-
-        $configurations = Initialize-SettingsBlock -Configuration $currentLcmConfig
-            
-        foreach($partial in $currentLcmConfig.PartialConfigurations)
-        {
-            if($partial.ResourceId.Replace('[PartialConfiguration]','') -ne $PartialName)
-            {
-                if($partial.DependsOn -contains "[PartialConfiguration]$PartialName")
-                {
-                    $partial.DependsOn = $partial.DependsOn.Where({$_ -ne "[PartialConfiguration]$PartialName"})
-                }
-
-                $configurations += Initialize-PartialBlock -Configuration $partial
-            }
-        }
-
-        $null = Invoke-LcmConfig -ComputerName $computerName -Configuration $configurations -OutputPath $OutputPath
-        Set-DscLocalConfigurationManager -CimSession $CimSession -Path $OutputPath -Force
+        throw "Invalid partial name, $PartialName."
     }
-    finally
-    {
-        if($DeleteMofWhenDone)
-        {
-            Remove-Item $OutputPath\$computerName.meta.mof -Force -ErrorAction Ignore
-        }
 
-        $ErrorActionPreference = $oldEap
+    $configurations = Initialize-SettingsBlock -Configuration $currentLcmConfig
+            
+    foreach($partial in $currentLcmConfig.PartialConfigurations)
+    {
+        if($partial.ResourceId.Replace('[PartialConfiguration]','') -ne $PartialName)
+        {
+            if($partial.DependsOn -contains "[PartialConfiguration]$PartialName")
+            {
+                $partial.DependsOn = $partial.DependsOn.Where({$_ -ne "[PartialConfiguration]$PartialName"})
+            }
+
+            $configurations += Initialize-PartialBlock -Configuration $partial
+        }
+    }
+
+    $null = Invoke-LcmConfig -ComputerName $computerName -Configuration $configurations -OutputPath $OutputPath
+    Set-DscLocalConfigurationManager -CimSession $CimSession -Path $OutputPath -Force
+
+    if($DeleteMofWhenDone)
+    {
+        Remove-Item $OutputPath\$computerName.meta.mof -Force -ErrorAction Ignore
     }
 }
 
@@ -276,96 +294,119 @@ function Remove-LcmPartialConfiguration
     .PARAMETER PartialName
         The name of the partial configuration to add to the target
 
+    .PARAMETER ConfigurationSource
+        An array of names of configuration servers, previously defined in ConfigurationRepositoryWeb and ConfigurationRepositoryShare blocks, where the partial configuration is pulled from.
+    
+    .PARAMETER Description
+        Text used to describe the partial configuration.
+            
+    .PARAMETER ExclusiveResources
+        An array of resources exclusive to this partial configuration.
+
+    .PARAMETER RefreshMode
+        Specifies how the LCM gets configurations. The possible values are "Disabled", "Push", and "Pull".
+
+    .PARAMETER ResourceModuleSource
+        An array of the names of resource servers from which to download required resources for this partial configuration         
+
     .PARAMETER DeleteMofWhenDone
         Specifies whether or not to cleanup the resulting meta.mof file
 
     .EXAMPLE This command will add the partial configuration 'test partial' on the target, 'localhost'
         Add-LcmPartialConfiguration -CimSession localhost -PartialName 'test partial'
 #>
-function Add-LcmPartialConfiguration
+Function Add-LcmPartialConfiguration
 {
     [CmdletBinding()]
-    param
+    Param
     (    
         [Parameter(Mandatory = $true)]
-        [psobject]$CimSession,
+        [psobject]
+        $CimSession,
         
         [Parameter(Mandatory = $true)]
-        [string]$PartialName,
+        [string]
+        $PartialName,
 
+        [Parameter(Mandatory = $true)]
         [ValidateSet('Disabled','Push','Pull')]
-        [string]$RefreshMode = 'Push',
+        [string]
+        $RefreshMode,
+        
+        [Parameter()]
+        [string[]]
+        $ConfigurationSource,
+        
+        [Parameter()]
+        [System.Collections.Generic.List[string]]
+        $DependsOn,
+        
+        [Parameter()]
+        [string]
+        $Description,
+        
+        [Parameter()]
+        [string[]]
+        $ExclusiveResources,
+        
+        [Parameter()]
+        [string[]]
+        $ResourceModuleSource,
 
-        [string]$OutputPath = "$env:windir\Temp\MofStore",
-        
-        [string[]]$ConfigurationSource,
-        
-        [System.Collections.Generic.List[string]]$DependsOn,
-        
-        [string]$Description,
-        
-        [string[]]$ExclusiveResources,
-             
-        [string[]]$ResourceModuleSource,
+        [Parameter()]
+        [string]
+        $OutputPath = "C:\Windows\Temp\MofStore",
 
-        [switch]$DeleteMofWhenDone        
+        [Parameter()]
+        [boolean]
+        $DeleteMofWhenDone = $true
     )
     
-    $oldEap = $ErrorActionPreference
-    $ErrorActionPreference = 'Stop'
-    $commonParameters = Get-CommonParameterName
+    $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop
+    $commonParameters = [System.Management.Automation.Cmdlet]::CommonParameters + [System.Management.Automation.Cmdlet]::OptionalCommonParameters
     $computerName = Get-ComputerName -CimSession $CimSession
-
-    try
-    {        
-        Test-OutputPath -Path $OutputPath
-        $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession | Select-Object -ExcludeProperty DebugMode
-        $existingPartials = $currentLcmConfig.PartialConfigurations.ResourceId
+    $null = Test-OutputPath -Path $OutputPath
+    $existingPartials = $currentLcmConfig.PartialConfigurations.ResourceId
         
-        if($existingPartials -and $existingPartials.Replace('[PartialConfiguration]','') -contains $PartialName)
-        {
-            $partialExists = $true
-            Write-Warning "Partial configuration $PartialName already exists on computer $ComputerName"
-        }
-        
-        $pendingChanges = $PSBoundParameters.Keys.Where({$commonParameters -notcontains $_})
-
-        $hashChanges = @{}
-        foreach($pendingChange in $pendingChanges)
-        {
-            if($pendingChange -eq 'PartialName')
-            {
-                $hashChanges.Add("ResourceId", "[PartialConfiguration]$($PSBoundParameters[$pendingChange])")
-            }
-            else
-            {
-                $hashChanges.Add($pendingChange, $PSBoundParameters[$pendingChange])
-            }
-        }
-
-        $configurations = Initialize-SettingsBlock -Configuration $currentLcmConfig
-            
-        foreach($partial in $currentLcmConfig.PartialConfigurations)
-        {
-            $configurations += Initialize-PartialBlock -Configuration $partial
-        }
-
-        if(-not $partialExists)
-        {
-            $configurations += Initialize-PartialBlock -Configuration $(New-Object -TypeName PsObject -Property $hashChanges)
-        }
-
-        $null = Invoke-LcmConfig -ComputerName $computerName -Configuration $configurations -OutputPath $OutputPath
-        Set-DscLocalConfigurationManager -CimSession $CimSession -Path $OutputPath -Force
+    if($existingPartials -and $existingPartials.Replace('[PartialConfiguration]','') -contains $PartialName)
+    {
+        $partialExists = $true
+        Write-Warning "Partial configuration $PartialName already exists on computer $ComputerName"
     }
-    finally
-    {     
-        if($DeleteMofWhenDone)
+        
+    $pendingChanges = $PSBoundParameters.Keys.Where({$commonParameters -notcontains $_})
+
+    $hashChanges = @{}
+    foreach($pendingChange in $pendingChanges)
+    {
+        if($pendingChange -eq 'PartialName')
         {
-            Remove-Item $OutputPath\$computerName.meta.mof -Force -ErrorAction Ignore
+            $hashChanges.Add("ResourceId", "[PartialConfiguration]$($PSBoundParameters[$pendingChange])")
         }
-       
-        $ErrorActionPreference = $oldEap
+        else
+        {
+            $hashChanges.Add($pendingChange, $PSBoundParameters[$pendingChange])
+        }
+    }
+
+    $configurations = Initialize-SettingsBlock -Configuration $currentLcmConfig
+            
+    foreach($partial in $currentLcmConfig.PartialConfigurations)
+    {
+        $configurations += Initialize-PartialBlock -Configuration $partial
+    }
+
+    if(-not $partialExists)
+    {
+        $configurations += Initialize-PartialBlock -Configuration $(New-Object -TypeName PsObject -Property $hashChanges)
+    }
+
+    $null = Invoke-LcmConfig -ComputerName $computerName -Configuration $configurations -OutputPath $OutputPath
+    Set-DscLocalConfigurationManager -CimSession $CimSession -Path $OutputPath -Force
+
+    if($DeleteMofWhenDone)
+    {
+        Remove-Item $OutputPath\$computerName.meta.mof -Force -ErrorAction Ignore
     }
 }
 
@@ -393,7 +434,7 @@ function Add-LcmPartialConfiguration
         An array of resources exclusive to this partial configuration.
 
     .PARAMETER RefreshMode
-        Specifies what happens after a reboot during the application of a configuration. 
+        Specifies how the LCM gets configurations. The possible values are "Disabled", "Push", and "Pull".
 
     .PARAMETER ResourceModuleSource
         An array of the names of resource servers from which to download required resources for this partial configuration         
@@ -405,96 +446,119 @@ function Add-LcmPartialConfiguration
         Set-LcmPartialConfiguration -CimSession localhost -PartialName 'Test partial' -Description 'Test partial description'
 
 #>
-function Set-LcmPartialConfiguration
+Function Set-LcmPartialConfiguration
 {
-    param
+    Param
     (
         [Parameter(Mandatory = $true)]
-        [psobject]$CimSession,
+        [psobject]
+        $CimSession,
 
-        [string]$OutputPath = "$env:windir\Temp\MofStore",
+        [Parameter()]
+        [string]
+        $PartialName,
 
-        [string]$PartialName,
-
-        [string[]]$ConfigurationSource,
+        [Parameter()]
+        [string[]]
+        $ConfigurationSource,
         
-        [System.Collections.Generic.List[string]]$DependsOn,
+        [Parameter()]
+        [System.Collections.Generic.List[string]]
+        $DependsOn,
         
-        [string]$Description,
+        [Parameter()]
+        [string]
+        $Description,
         
-        [string[]]$ExclusiveResources,
+        [Parameter()]
+        [string[]]
+        $ExclusiveResources,
         
+        [Parameter()]
         [ValidateSet('Disabled','Push','Pull')]
-        [string]$RefreshMode,
-                
-        [string[]]$ResourceModuleSource,
+        [string]
+        $RefreshMode,
+        
+        [Parameter()]
+        [string[]]
+        $ResourceModuleSource,
 
-        [switch]$DeleteMofWhenDone        
+        [Parameter()]
+        [string]
+        $OutputPath = "$env:windir\Temp\MofStore",
+
+        [Parameter()]
+        [boolean]
+        $DeleteMofWhenDone = $true
     )
 
-    $oldEap = $ErrorActionPreference
-    $ErrorActionPreference = 'Stop'
-    $commonParameters = Get-CommonParameterName
+    $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop
+    $commonParameters = [System.Management.Automation.Cmdlet]::CommonParameters + [System.Management.Automation.Cmdlet]::OptionalCommonParameters
     $computerName = Get-ComputerName -CimSession $CimSession
+    $null = Test-OutputPath -Path $OutputPath
+    $partialConfiguration = $currentLcmConfig.PartialConfigurations.Where({$($_.ResourceId.Replace('[PartialConfiguration]','')) -eq $PartialName})
 
-    try
+    if(-not $partialConfiguration)
     {
-        Test-OutputPath -Path $OutputPath
-        $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession | Select-Object -ExcludeProperty DebugMode
-        $partialConfiguration = $currentLcmConfig.PartialConfigurations.Where({$($_.ResourceId.Replace('[PartialConfiguration]','')) -eq $PartialName})
-
-        if(-not $partialConfiguration)
-        {
-            throw "Invalid partial name, $PartialName."
-        }
+        throw "Invalid partial name, $PartialName."
+    }
         
-        $pendingChanges = $PSBoundParameters.Keys.Where({$commonParameters -notcontains $_})
-        $configurations = Initialize-SettingsBlock -Configuration $currentLcmConfig
-        
-        foreach($partial in $currentLcmConfig.PartialConfigurations)
+    $pendingChanges = $PSBoundParameters.Keys.Where({$commonParameters -notcontains $_})
+    $configurations = Initialize-SettingsBlock -Configuration $currentLcmConfig
+    foreach($partial in $currentLcmConfig.PartialConfigurations)
+    {
+        if($partial.ResourceId -eq $partialConfiguration.ResourceId)
         {
-            if($partial.ResourceId -eq $partialConfiguration.ResourceId)
+            $hashChanges = @{}
+            foreach($pendingChange in $pendingChanges)
             {
-                foreach($key in $pendingChanges)
+                if($pendingChange -eq 'PartialName')
                 {
-                    $partial.$key = $PSBoundParameters[$key]
+                    $hashChanges.Add("ResourceId", "[PartialConfiguration]$($PSBoundParameters[$pendingChange])")
+                }
+                else
+                {
+                    $hashChanges.Add($pendingChange, $PSBoundParameters[$pendingChange])
                 }
             }
-
+            
+            $configurations += Initialize-PartialBlock -Configuration $(New-Object -TypeName PsObject -Property $hashChanges)
+        }
+        else
+        {
             $configurations += Initialize-PartialBlock -Configuration $partial
         }
-
-        $null = Invoke-LcmConfig -ComputerName $ComputerName -Configuration $configurations -OutputPath $OutputPath
-        Set-DscLocalConfigurationManager -CimSession $CimSession -Path $OutputPath -Force
     }
-    finally
-    {          
-        if($DeleteMofWhenDone)
-        {
-            Remove-Item $OutputPath\$computerName.meta.mof -Force -ErrorAction Ignore
-        }
-  
-        $ErrorActionPreference = $oldEap
+        
+    $null = Invoke-LcmConfig -ComputerName $ComputerName -Configuration $configurations -OutputPath $OutputPath
+    Set-DscLocalConfigurationManager -CimSession $CimSession -Path $OutputPath -Force
+
+    if($DeleteMofWhenDone)
+    {
+        Remove-Item $OutputPath\$computerName.meta.mof -Force -ErrorAction Ignore
     }
 }
 
-function Invoke-LcmConfig
+Function Invoke-LcmConfig
 {
     [CmdletBinding()]
-    param
+    Param
     (
         [Parameter(Mandatory = $true)]
-        [string]$ComputerName,
+        [string]
+        $ComputerName,
 
         [Parameter(Mandatory = $true)]
-        [string]$Configuration,
+        [string]
+        $Configuration,
 
         [Parameter(Mandatory = $true)]
-        [string]$OutputPath
+        [string]
+        $OutputPath
     )
 
     [DSCLocalConfigurationManager()]
-    configuration LcmConfig
+    Configuration LcmConfig
     {
         Node $ComputerName
         {
@@ -505,23 +569,13 @@ function Invoke-LcmConfig
     LcmConfig -OutputPath $OutputPath
 }
 
-function Get-CommonParameterName
+Function Get-ComputerName
 {
-    [CmdletBinding()]
-    param
-    (
-        $CimSession
-    )
-
-    (Get-Command Get-CommonParameterName).Parameters.Keys
-}
-
-function Get-ComputerName
-{
-    param
+    Param
     (
         [Parameter(Mandatory = $true)]
-        [psobject]$CimSession
+        [psobject]
+        $CimSession
     )
 
     if($CimSession -is [Microsoft.Management.Infrastructure.CimSession])
@@ -534,25 +588,28 @@ function Get-ComputerName
     }
 }
 
-function Test-OutputPath
+Function Test-OutputPath
 {
-    param
+    Param
     (
         [Parameter(Mandatory = $true)]
-        [string]$Path
+        [string]
+        $Path
     )
 
     if(-not (Test-Path $OutputPath))
     {
-        $null = New-Item -Path $OutputPath -ItemType Directory
+        New-Item -Path $OutputPath -ItemType Directory
     }
 }
 
-function Initialize-PartialBlock
+Function Initialize-PartialBlock
 {
-    param
+    Param
     (
-        [psobject]$Configuration
+        [Parameter()]
+        [psobject]
+        $Configuration
     )
 
     $PartialConfigurationParameters = @(
@@ -580,9 +637,9 @@ function Initialize-PartialBlock
     return $output
 }
 
-function Initialize-SettingsBlock
+Function Initialize-SettingsBlock
 {
-    param
+    Param
     (
         [Parameter(Mandatory = $true)]
         [psobject]$Configuration
