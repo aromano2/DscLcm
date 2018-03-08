@@ -41,6 +41,10 @@ The **DscLcm** module comes with the following functions to manage the LCM: **Se
 
 * **DeleteMofWhenDone** Specifies whether or not to cleanup the resulting meta.mof file
 
+####Example
+* This command will set the RebootNodeIfNeeded to 'True' on the target, 'localhost'
+        Set-LcmSetting -CimSession localhost -RebootNodeIfNeeded $true
+
 ### **Add-LcmPartialConfiguration**
 
 * **CimSession** The cimsession object or computer name of the target computer to be modified.
