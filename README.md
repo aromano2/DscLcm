@@ -66,6 +66,11 @@ The **DscLcm** module comes with the following functions to manage the LCM: **Se
 
 * **DeleteMofWhenDone** Specifies whether or not to cleanup the resulting meta.mof file
 
+#### Example
+* This command will add the partial configuration 'test partial' on the target, 'localhost'
+
+        Add-LcmPartialConfiguration -CimSession localhost -PartialName 'test partial'
+
 ### **Remove-LcmPartialConfiguration**
 
 * **CimSession** The cimsession object or computer name of the target computer to be modified.
@@ -75,6 +80,11 @@ The **DscLcm** module comes with the following functions to manage the LCM: **Se
 * **OutputPath** The output path for mof files to be stored.
 
 * **DeleteMofWhenDone** Specifies whether or not to cleanup the resulting meta.mof file
+
+#### Example
+* This command will remove the partial configuration 'test partial' on the target, 'localhost'
+
+        Remove-LcmPartialConfiguration -CimSession localhost -PartialName 'test partial'
 
 ### **Set-LcmPartialConfiguration**
 
@@ -105,6 +115,11 @@ The **DscLcm** module comes with the following functions to manage the LCM: **Se
 * **OutputPath** The output path for mof files to be stored.
 
 * **DeleteMofWhenDone** Specifies whether or not to cleanup the resulting meta.mof file
+
+#### Example
+* This command will set the Description to 'Test partial description' on the partial, 'Test partial' on the target, 'localhost'
+
+        Set-LcmPartialConfiguration -CimSession localhost -PartialName 'Test partial' -Description 'Test partial description'
 
 
 ### 1.0
