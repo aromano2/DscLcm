@@ -42,9 +42,9 @@ The **DscLcm** module comes with the following functions to manage the LCM: **Se
 * **DeleteMofWhenDone** Specifies whether or not to cleanup the resulting meta.mof file
 
 #### Example
-* This command will set the RebootNodeIfNeeded to 'True' on the target, 'localhost'
+* This command will set the RebootNodeIfNeeded to 'True' on the local machine
         
-        Set-LcmSetting -CimSession localhost -RebootNodeIfNeeded $true
+        Set-LcmSetting -RebootNodeIfNeeded $true
 
 ### **Add-LcmPartialConfiguration**
 
@@ -130,3 +130,7 @@ The **DscLcm** module comes with the following functions to manage the LCM: **Se
 * Bug fix for Set-LcmPartialConfiguration
 * Help file cleanup
 * Readme updated
+
+### 1.2
+* Bug fix on module manifest
+* Made CimSession optional parameter, adjusted logic to account for functions running on local machine

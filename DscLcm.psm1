@@ -49,7 +49,7 @@ Function Set-LcmSetting
 {
     Param
     (
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [psobject]
         $CimSession,
         
@@ -112,8 +112,19 @@ Function Set-LcmSetting
 
     #Requires -RunAsAdministrator
 
-    $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop
-    $computerName = Get-ComputerName -CimSession $CimSession
+    if($CimSession)
+    {
+        $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop
+        $computerName = Get-ComputerName -CimSession $CimSession
+
+    }
+    else
+    {
+        $currentLcmConfig = Get-DscLocalConfigurationManager -ErrorAction Stop
+        $computerName = $env:COMPUTERNAME
+        $CimSession = $env:COMPUTERNAME
+    }
+
     $null = Test-OutputPath -Path $OutputPath
     $pendingChanges = $PSBoundParameters.Keys.Where({$script:commonParameters -notcontains $_})
 
@@ -160,7 +171,7 @@ Function Reset-LcmConfiguration
     [CmdletBinding()]
     Param
     (
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [psobject]
         $CimSession,
 
@@ -174,8 +185,21 @@ Function Reset-LcmConfiguration
 
     #Requires -RunAsAdministrator
     
-    $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop | Select-Object -Property RebootNodeIfNeeded,ConfigurationMode,RefreshMode,ActionAfterReboot
-    $computerName = Get-ComputerName -CimSession $CimSession
+    $selectProperties = 'RebootNodeIfNeeded','ConfigurationMode','RefreshMode','ActionAfterReboot'
+    
+    if($CimSession)
+    {
+        $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop | Select-Object -Property $selectProperties
+        $computerName = Get-ComputerName -CimSession $CimSession
+
+    }
+    else
+    {
+        $currentLcmConfig = Get-DscLocalConfigurationManager -ErrorAction Stop | Select-Object -Property $selectProperties
+        $computerName = $env:COMPUTERNAME
+        $CimSession = $env:COMPUTERNAME
+    }
+
     $null = Test-OutputPath -Path $OutputPath
     $configurations = Initialize-SettingsBlock -Configuration $currentLcmConfig
 
@@ -230,7 +254,7 @@ Function Remove-LcmPartialConfiguration
     [CmdletBinding()]
     Param
     (    
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [psobject]
         $CimSession,
         
@@ -248,9 +272,20 @@ Function Remove-LcmPartialConfiguration
     )
 
     #Requires -RunAsAdministrator
+
+    if($CimSession)
+    {
+        $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop
+        $computerName = Get-ComputerName -CimSession $CimSession
+
+    }
+    else
+    {
+        $currentLcmConfig = Get-DscLocalConfigurationManager -ErrorAction Stop
+        $computerName = $env:COMPUTERNAME
+        $CimSession = $env:COMPUTERNAME
+    }
     
-    $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop
-    $computerName = Get-ComputerName -CimSession $CimSession
     $null = Test-OutputPath -Path $OutputPath
     $partialConfiguration = $currentLcmConfig.PartialConfigurations.Where({$($_.ResourceId.Replace('[PartialConfiguration]','')) -eq $PartialName})
 
@@ -323,7 +358,7 @@ Function Add-LcmPartialConfiguration
     [CmdletBinding()]
     Param
     (    
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [psobject]
         $CimSession,
         
@@ -367,8 +402,19 @@ Function Add-LcmPartialConfiguration
     
     #Requires -RunAsAdministrator
 
-    $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop
-    $computerName = Get-ComputerName -CimSession $CimSession
+    if($CimSession)
+    {
+        $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop
+        $computerName = Get-ComputerName -CimSession $CimSession
+
+    }
+    else
+    {
+        $currentLcmConfig = Get-DscLocalConfigurationManager -ErrorAction Stop
+        $computerName = $env:COMPUTERNAME
+        $CimSession = $env:COMPUTERNAME
+    }
+    
     $null = Test-OutputPath -Path $OutputPath
     $existingPartials = $currentLcmConfig.PartialConfigurations.ResourceId
         
@@ -458,7 +504,7 @@ Function Set-LcmPartialConfiguration
 {
     Param
     (
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [psobject]
         $CimSession,
 
@@ -502,8 +548,19 @@ Function Set-LcmPartialConfiguration
 
     #Requires -RunAsAdministrator
 
-    $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop
-    $computerName = Get-ComputerName -CimSession $CimSession
+    if($CimSession)
+    {
+        $currentLcmConfig = Get-DscLocalConfigurationManager -CimSession $CimSession -ErrorAction Stop
+        $computerName = Get-ComputerName -CimSession $CimSession
+
+    }
+    else
+    {
+        $currentLcmConfig = Get-DscLocalConfigurationManager -ErrorAction Stop
+        $computerName = $env:COMPUTERNAME
+        $CimSession = $env:COMPUTERNAME
+    }
+    
     $null = Test-OutputPath -Path $OutputPath
     $partialConfiguration = $currentLcmConfig.PartialConfigurations.Where({$($_.ResourceId.Replace('[PartialConfiguration]','')) -eq $PartialName})
 
