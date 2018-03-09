@@ -591,6 +591,15 @@ Function Set-LcmPartialConfiguration
                     $hashChanges.Add($pendingChange, $PSBoundParameters[$pendingChange])
                 }
             }
+
+            $unmodifiedProperties = ($partial | Get-Member -MemberType Property).Name | Where-Object {$hashChanges.Keys -notcontains $_}
+            foreach($existingProperty in $unmodifiedProperties)
+            {
+                if($partial.$existingProperty)
+                {
+                    $hashChanges.Add($existingProperty, $partial.$existingProperty)
+                }
+            }
             
             $configurations += Initialize-PartialBlock -Configuration $(New-Object -TypeName PsObject -Property $hashChanges)
         }
