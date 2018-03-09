@@ -138,3 +138,6 @@ The **DscLcm** module comes with the following functions to manage the LCM: **Se
 ### 1.2
 * Bug fix on module manifest
 * Made CimSession optional parameter, adjusted logic to account for functions running on local machine
+
+### 1.2.1
+* Bug fix for Set-LcmPartialConfiguration
