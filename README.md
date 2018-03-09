@@ -8,9 +8,13 @@ The **DscLcm** module comes with the following functions to manage the LCM: **Se
 
 ## Functions
 **Set-LcmSetting** Modifies settings in the LCM Settings Configuration block
+
 **Add-LcmPartialConfiguration** Adds a new partial configuration to an LCM
+
 **Remove-LcmPartialConfiguration** Removes a partial configuration from an LCM
+
 **Set-LcmPartialConfiguration** Modifies a setting on an existing partial configuration in the LCM
+
 **Reset-LcmConfiguration** Resets the LCM's settings to a default state
 
 ### **Set-LcmSetting**
