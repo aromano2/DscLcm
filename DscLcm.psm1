@@ -103,7 +103,7 @@ Function Set-LcmSetting
 
         [Parameter()]        
         [string]
-        $OutputPath = "C:\Windows\Temp\MofStore",
+        $OutputPath = "$env:windir\Temp\MofStore",
         
         [Parameter()]
         [boolean]
@@ -176,7 +176,7 @@ Function Reset-LcmConfiguration
         $CimSession,
 
         [string]
-        $OutputPath = "C:\Windows\Temp\MofStore",
+        $OutputPath = "$env:windir\Temp\MofStore",
 
         [Parameter()]
         [boolean]
@@ -264,7 +264,7 @@ Function Remove-LcmPartialConfiguration
 
         [Parameter()]
         [string]
-        $OutputPath = "C:\Windows\Temp\MofStore",
+        $OutputPath = "$env:windir\Temp\MofStore",
 
         [Parameter()]
         [boolean]
@@ -393,7 +393,7 @@ Function Add-LcmPartialConfiguration
 
         [Parameter()]
         [string]
-        $OutputPath = "C:\Windows\Temp\MofStore",
+        $OutputPath = "$env:windir\Temp\MofStore",
 
         [Parameter()]
         [boolean]
