@@ -700,7 +700,7 @@ Function Initialize-PartialBlock
         'ResourceModuleSource'
     )
 
-    $output += "PartialConfiguration $($Configuration.ResourceId.Split("]")[1])`n"
+    $output = "PartialConfiguration $($Configuration.ResourceId.Split("]")[1])`n"
     $output += "{`n"
         
     foreach($partialProperty in $PartialConfigurationParameters)
