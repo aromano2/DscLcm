@@ -141,3 +141,6 @@ The **DscLcm** module comes with the following functions to manage the LCM: **Se
 
 ### 1.2.1
 * Bug fix for Set-LcmPartialConfiguration
+
+### 1.2.2
+* Bug fix for build partial settings block
